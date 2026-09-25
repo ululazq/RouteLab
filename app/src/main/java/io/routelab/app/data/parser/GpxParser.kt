@@ -1,93 +1,86 @@
 package io.routelab.app.data.parser
 
 import io.routelab.app.domain.model.GeoPoint
-import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserFactory
+import org.xml.sax.Attributes
+import org.xml.sax.InputSource
+import org.xml.sax.helpers.DefaultHandler
 import java.io.InputStream
 import java.io.StringReader
+import javax.xml.parsers.SAXParserFactory
 
 class GpxParser {
 
     fun parse(inputStream: InputStream): List<GeoPoint> {
-        val factory = XmlPullParserFactory.newInstance()
-        factory.isNamespaceAware = true
-        val parser = factory.newPullParser()
-        parser.setInput(inputStream, "UTF-8")
-        return parseInternal(parser)
+        return parseInputSource(InputSource(inputStream))
     }
 
     fun parse(xmlString: String): List<GeoPoint> {
-        val factory = XmlPullParserFactory.newInstance()
-        factory.isNamespaceAware = true
-        val parser = factory.newPullParser()
-        parser.setInput(StringReader(xmlString))
-        return parseInternal(parser)
+        return parseInputSource(InputSource(StringReader(xmlString)))
     }
 
-    private fun parseInternal(parser: XmlPullParser): List<GeoPoint> {
+    private fun parseInputSource(source: InputSource): List<GeoPoint> {
         val points = mutableListOf<GeoPoint>()
-        var eventType = parser.eventType
+        try {
+            val factory = SAXParserFactory.newInstance()
+            factory.isNamespaceAware = false
+            val saxParser = factory.newSAXParser()
 
-        var currentLat: Double? = null
-        var currentLon: Double? = null
-        var currentEle: Double? = null
-        var currentTime: String? = null
-        var currentTag = ""
+            val handler = object : DefaultHandler() {
+                var currentLat: Double? = null
+                var currentLon: Double? = null
+                var currentEle: Double? = null
+                var currentTime: String? = null
+                val contentBuffer = StringBuilder()
 
-        while (eventType != XmlPullParser.END_DOCUMENT) {
-            when (eventType) {
-                XmlPullParser.START_TAG -> {
-                    currentTag = parser.name
-                    if (currentTag.equals("trkpt", ignoreCase = true) ||
-                        currentTag.equals("rtept", ignoreCase = true) ||
-                        currentTag.equals("wpt", ignoreCase = true)
-                    ) {
-                        currentLat = parser.getAttributeValue(null, "lat")?.toDoubleOrNull()
-                        currentLon = parser.getAttributeValue(null, "lon")?.toDoubleOrNull()
+                override fun startElement(uri: String, localName: String, qName: String, attributes: Attributes) {
+                    val tag = qName.lowercase()
+                    contentBuffer.setLength(0)
+
+                    if (tag.endsWith("trkpt") || tag.endsWith("rtept") || tag.endsWith("wpt")) {
+                        currentLat = attributes.getValue("lat")?.toDoubleOrNull()
+                        currentLon = attributes.getValue("lon")?.toDoubleOrNull()
                         currentEle = null
                         currentTime = null
                     }
                 }
-                XmlPullParser.TEXT -> {
-                    val text = parser.text?.trim() ?: ""
-                    if (text.isNotEmpty()) {
-                        when {
-                            currentTag.equals("ele", ignoreCase = true) -> {
-                                currentEle = text.toDoubleOrNull()
-                            }
-                            currentTag.equals("time", ignoreCase = true) -> {
-                                currentTime = text
-                            }
-                        }
-                    }
+
+                override fun characters(ch: CharArray, start: Int, length: Int) {
+                    contentBuffer.append(ch, start, length)
                 }
-                XmlPullParser.END_TAG -> {
-                    val endTag = parser.name
-                    if (endTag.equals("trkpt", ignoreCase = true) ||
-                        endTag.equals("rtept", ignoreCase = true) ||
-                        endTag.equals("wpt", ignoreCase = true)
-                    ) {
-                        if (currentLat != null && currentLon != null) {
-                            points.add(
-                                GeoPoint(
-                                    latitude = currentLat,
-                                    longitude = currentLon,
-                                    elevation = currentEle ?: 0.0,
-                                    time = currentTime
+
+                override fun endElement(uri: String, localName: String, qName: String) {
+                    val tag = qName.lowercase()
+                    val text = contentBuffer.toString().trim()
+
+                    when {
+                        tag.endsWith("ele") -> currentEle = text.toDoubleOrNull()
+                        tag.endsWith("time") -> currentTime = text
+                        tag.endsWith("trkpt") || tag.endsWith("rtept") || tag.endsWith("wpt") -> {
+                            val lat = currentLat
+                            val lon = currentLon
+                            if (lat != null && lon != null) {
+                                points.add(
+                                    GeoPoint(
+                                        latitude = lat,
+                                        longitude = lon,
+                                        elevation = currentEle ?: 0.0,
+                                        time = currentTime
+                                    )
                                 )
-                            )
+                            }
+                            currentLat = null
+                            currentLon = null
+                            currentEle = null
+                            currentTime = null
                         }
-                        currentLat = null
-                        currentLon = null
-                        currentEle = null
-                        currentTime = null
                     }
-                    currentTag = ""
                 }
             }
-            eventType = parser.next()
-        }
 
+            saxParser.parse(source, handler)
+        } catch (e: Exception) {
+            // Return whatever valid points were accumulated
+        }
         return points
     }
 }

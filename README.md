@@ -97,13 +97,3 @@ Upload Artifact & Buat GitHub Release (pada tag v*)
 # Membangun Debug APK
 ./gradlew assembleDebug
 ```
-
----
-
-## Audit & Kepatuhan Antislop
-
-- **R-02 (Copywriting):** Bebas dari karakter em dash (`—`) pada seluruh salinan UI; digantikan dengan tanda baca natural (`:`, `,`, `-`).
-- **R-16 & R-17 (Data & Claims):** Bebas dari buzzword generik AI dan statistik palsu; seluruh metrik dihitung melalui formula fisik nyata (Haversine, rasio gradien, UCI climb index).
-- **R-21 & R-25 (Contrast & Theme):** Menggunakan palet Dark Mode OLED kontras tinggi yang ramah baterai dan memenuhi standar WCAG AA/AAA.
-- **R-26 (Interactive Elements):** Tidak ada tombol mati (*dead controls*); setiap interaksi (penggeser, tab, pemilih rute, keping prompt AI) memiliki respon fungsional nyata.
-- **R-27 (UI States):** Mendukung kondisi *Loading*, *Content*, dan *Error* secara tangguh.

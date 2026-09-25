@@ -20,6 +20,10 @@ android {
         }
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     val keystorePath = System.getenv("KEYSTORE_PATH")
     signingConfigs {
         create("release") {
