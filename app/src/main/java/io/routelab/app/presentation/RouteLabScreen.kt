@@ -65,7 +65,7 @@ fun RouteLabScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterVertically) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(color = AccentBlue)
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
