@@ -1,16 +1,12 @@
-# Build & sign a Release APK on GitHub.
+# RouteLab Automated CI/CD Pipeline
+# Performs validation, lint, unit tests, and builds both Debug and Signed Release APKs.
 #
 # Triggers:
 #   - push / PR to main or master
-#   - version tag push (v*), e.g. v1.0.0 -> also creates a GitHub Release
+#   - version tag push (v*), e.g. v0.1.0 -> creates a GitHub Release
 #   - manual run (workflow_dispatch)
-#
-# Required GitHub Secrets (see SETUP.md):
-#   KEYSTORE_BASE64     base64-encoded .jks/.keystore file
-#   KEYSTORE_PASSWORD   keystore password
-#   KEY_ALIAS           key alias
-#   KEY_PASSWORD        key password
-name: Build Release APK
+
+name: RouteLab CI & Build
 
 on:
   push:
@@ -20,14 +16,12 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-# `contents: write` is needed so we can create a GitHub Release (with the APK
-# attached) when a version tag is pushed.
 permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build Signed Release APK
+  validate-and-build:
+    name: Lint, Test & Build APKs
     runs-on: ubuntu-latest
 
     steps:
@@ -46,15 +40,42 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Run Lint
+        run: ./gradlew lintDebug --no-daemon
+
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename & Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RouteLab-debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Check for Release Signing Credentials
+        id: check_secrets
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "has_keystore=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_keystore=false" >> $GITHUB_OUTPUT
+            echo "Release keystore secret not detected. Skipping signed release build."
+          fi
+
       - name: Decode signing keystore
-        # KEYSTORE_BASE64 is the base64-encoded keystore stored as a secret.
-        # We decode it back into a binary .jks file for Gradle to sign with.
+        if: steps.check_secrets.outputs.has_keystore == 'true'
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
 
-      - name: Build release APK
+      - name: Build Signed Release APK
+        if: steps.check_secrets.outputs.has_keystore == 'true'
         run: ./gradlew assembleRelease --no-daemon
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
@@ -62,16 +83,17 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Upload APK artifact
+      - name: Upload Release APK Artifact
+        if: steps.check_secrets.outputs.has_keystore == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
+          name: RouteLab-release
           path: app/build/outputs/apk/release/*.apk
           retention-days: 30
           if-no-files-found: error
 
       - name: Create GitHub Release on tag push
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && steps.check_secrets.outputs.has_keystore == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/*.apk

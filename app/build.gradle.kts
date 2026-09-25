@@ -4,24 +4,22 @@ plugins {
 }
 
 android {
-    namespace = "com.example.myapp"
+    namespace = "io.routelab.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.myapp"
+        applicationId = "io.routelab.app"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
     }
 
-    // Signing credentials come from environment variables.
-    // In CI they are injected from GitHub Secrets (see SETUP.md);
-    // locally, export them before running ./gradlew assembleRelease.
-    //
-    // Guarded on KEYSTORE_PATH: without this guard, file("") throws
-    // "path may not be null or empty string" at CONFIGURATION time, which would
-    // break unrelated tasks too (debug builds, `gradle wrapper`, IDE sync).
     val keystorePath = System.getenv("KEYSTORE_PATH")
     signingConfigs {
         create("release") {
@@ -41,10 +39,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Sign only when credentials are present (i.e. in CI).
             if (!keystorePath.isNullOrBlank()) {
                 signingConfig = signingConfigs.getByName("release")
             }
+        }
+        debug {
+            applicationIdSuffix = ".debug"
+            isDebuggable = true
         }
     }
 
@@ -55,10 +56,35 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    buildFeatures {
+        compose = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
 }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+
+    // Jetpack Compose
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
+    testImplementation(libs.junit)
 }
